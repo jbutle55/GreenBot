@@ -13,7 +13,8 @@ import twist_mux_msgs
 # NODES
 # ---------------------------------------
 # Control pad Node
-# Husky Node to listen for control pad messages
+# Husky Node
+# Mux Node
 # QR Code node
 # Ultrasound/laser sensor Node
 # Front camera Node
@@ -42,7 +43,7 @@ def land(greenbot_process):  # Kill the GreenBot process
 
 
 class GreenBot:
-    """A node for the Husky A200. Subscribe to velocity commands, QR code detection,
+    """A node for the Husky A200. Subscribe to mux, velocity commands, QR code detection,
      rangefinder sensors."""
 
     def __init__(self):
