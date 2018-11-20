@@ -8,7 +8,7 @@ import roslaunch
 import theora_image_transport
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
-
+import twist_mux_msgs
 
 # NODES
 # ---------------------------------------
@@ -56,7 +56,8 @@ class GreenBot:
 
     # Subsciber to joystick input commands
     def sub_controller(self):
-        rospy.Subscriber("joy", Joy, self.callback_controller)  # Receive joystick input from joy topic
+        # Receive control input from joystick Node
+        rospy.Subscriber("joystick", Joy, self.callback_controller)
         return
 
     @staticmethod
@@ -90,14 +91,10 @@ class GreenBot:
     # Publisher of velocity commands to the GreenBot motor system
     @staticmethod
     def pub_cmb_vel():
-        rospy.init_node('control_to_direction', anonymous=True)
-        vel_cmd = rospy.Publisher('cmd_vel', Twist)  # Send velocity commands to cmd_vel Topic
+        # Send velocity commands to cmd_vel Topic
+        vel_cmd = rospy.Publisher('husky_velocity_controller/cmd_vel', Twist)
         rospy.spin()
         return
-
-
-
-
 
     def main(self):
 
