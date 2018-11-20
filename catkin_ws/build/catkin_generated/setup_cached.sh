@@ -7,4 +7,4 @@
 # new environment variables
 
 # modified environment variables
-export PWD="/home/parallels/catkin_ws/build"
+export PWD="/home/parallels/PycharmProjects/GreenBot/catkin_ws/build"

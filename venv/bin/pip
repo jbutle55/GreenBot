@@ -1,4 +1,4 @@
-#!/Users/justinbutler/Desktop/Capstone/venv/bin/python
+#!/home/parallels/PycharmProjects/GreenBot/venv/bin/python2.7
 
 # -*- coding: utf-8 -*-
 import re

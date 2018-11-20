@@ -1,2 +1,2 @@
 - setup-file:
-    local-name: /home/parallels/catkin_ws/devel/setup.sh
+    local-name: /home/parallels/PycharmProjects/GreenBot/catkin_ws/devel/setup.sh
