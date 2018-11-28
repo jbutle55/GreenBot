@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 
-
-import sys, os
-import husky_msgs
+import sys
 import rospy
-import roslaunch
-import theora_image_transport
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
-import twist_mux_msgs
 import argparse
 
 # Should this be top import?
@@ -17,29 +12,32 @@ roslib.load_manifest("GreenBot")
 
 
 # NODES
-# ---------------------------------------
+# -------------------
 # Control pad Node
-# Husky Node
+# Husky Node (MASTER)
 # Mux Node
 # QR Code node
 # Ultrasound/laser sensor Node
 # Front camera Node
-
+# Remote laptop Node
 
 # ------------------------------------------------------------------------------
+# GreenBot CLASS
+# ------------------------------------------------------------------------------
 class GreenBot:
-    """A node for the Husky A200
-    Subscribe to mux, QR code detection, and rangefinder sensors
-    Publish velocity commands
+    """
+    A node for the Husky A200
     """
 
-    def __init__(self, config):
-        self.__dict__.update(config)
-        self.detection_timeout = rospy.Duration(self.detection_timeout)
+    def __init__(self):
         self.setup_ros_node()
-
+        self.control_rate = 30  # TODO determine proper publish rate (Control_rate) below
         # Publish on husky_velocity_controller/cmd_vel topic
-        self.control_pub = rospy.Publisher('husky_velocity_controller/cmd_vel', Twist)
+        self.control_pub = rospy.Publisher("cmd_vel_topic", Twist)
+        # husky_velocity_controller/cmd_vel instead of vel_topic
+
+        self.mux_twist = Twist()
+        self.twist = Twist()
 
         return
 
@@ -48,24 +46,31 @@ class GreenBot:
         rospy.init_node('Husky', anonymous=True)  # Create the Husky node
 
         # Subscriber initiations
-        self.subscribe_node("controller")
-        self.subscribe_node("mux")
-        self.subscribe_node("prox")
-        self.subscribe_node("vid")
+        # self.subscribe_node("controller")  # Joystick controller Node
+        self.subscribe_node("mux")  # Mux Node
+        self.subscribe_node("prox")  # Proximity sensor Node
+        self.subscribe_node("vid")  # Video stream Node
+        self.subscribe_node('barcode')  # Barcode detector Node
 
         return
 
 # ------------------------------------------------------------------------------
     def subscribe_node(self, target):
-        if target is "controller":  # Does sub mux replace this?
-            rospy.Subscriber(self.controller_topic, Joy, self.callback_controller)
+        if target is "controller":  # TODO Does sub mux replace this?
+            rospy.Subscriber("husky/cmd_vel", Joy, self.callback_controller)
         elif target is "prox":
             # TODO Create proximity sensor sub once using sensors
             pass
-        elif target is "mux":
+        elif target is "mux":  # TODO Is mux better to use?
             rospy.Subscriber('cmd_vel', Twist, self.callback_mux)
         elif target is "vid":
-            rospy.Subscriber()
+            pass
+        elif target is "people":  # Detected person in auto mode
+            # TODO Implement people detector sub once developed
+            pass
+        elif target is "barcode":
+            # TODO Implement barcode sub once developed
+            pass
         return
 
     @staticmethod
@@ -85,57 +90,57 @@ class GreenBot:
         if len(data) == 0:
                 return  # No data input
 
-        mux_twist = Twist()
-        mux_twist.linear.x = data[0]
-        mux_twist.angular.z = data[1]
+        self.mux_twist.linear.x = data[0]
+        self.mux_twist.angular.z = data[1]
 
-        return mux_twist
-
-    @staticmethod
-    def callback_prox(data):
-        pass
-        return
-
-    # Publisher of velocity commands to the GreenBot motor system
-    @staticmethod
-    def pub_cmd_vel():
-        # Send velocity commands to cmd_vel Topic
-        rospy.Publisher('husky_velocity_controller/cmd_vel', Twist)
         return
 
 # ------------------------------------------------------------------------------
-    def publish_move(self, linear, angular):
-        
+    @staticmethod
+    def callback_prox(data):
+        # TODO Implement proximity data breakout
+        pass
+        return
+
+# ------------------------------------------------------------------------------
+    def publish_move(self, command):
+        # Receive Twist type command and publish to Husky controller
+        self.control_pub.publish(command)
         return
 
 # ------------------------------------------------------------------------------
     def compute_vel(self):
-        linear_cmd, angular_cmd = 0, 0
+        cmd = Twist()
 
-        return linear_cmd, angular_cmd
+        if self.mux_twist is not None:
+            cmd.linear.x = self.mux_twist.linear.x
+            cmd.angular.z = self.mux_twist.angular.z
+
+        elif self.twist is not None:
+            cmd.linear.x = self.twist.linear.x
+            cmd.angular.z = self.twist.angular.z
+
+        return cmd
 
 # ------------------------------------------------------------------------------
     def main(self):
         rate = rospy.Rate(self.control_rate)
         while not rospy.is_shutdown():
-            linear, angular = self.compute_vel()
+            command = self.compute_vel()
 
-            if linear != 0 or angular != 0:
-                self.publish_move(linear, angular)
+            if command.linear.x != 0 or command.angular.z != 0:
+                self.publish_move(command)
 
         rate.sleep()
 
         return
+# ------------------------------------------------------------------------------
+# END OF GreenBot CLASS
+# ------------------------------------------------------------------------------
 
 
 def run_greenbot(args):
-    # Standard config dict for both operation modes
-    config = dict(vel_topic=rospy.get_param("~cmd_vel_topic", "husky/plan_cmd_vel"),
-                  drive_rate=rospy.get_param("~drive_rate", 1.0),
-                  turn_rate=rospy.get_param("~turn_rate", 0.5),
-                  control_rate=rospy.get_param("~control_rate", 30),  # 30Hz publish rate
-                  controller_topic=rospy.get_param("joystick"))  # ~?
-
+    config = None
     if args.mode is 'tele':
         # Add dict keys relevant to teleoperation mode
         pass
@@ -154,4 +159,3 @@ if __name__ == '__main__':
                              "the GreenBot to autonomously patrol the greenhouse.")
     arguments = parser.parse_args()
     sys.exit(run_greenbot(arguments))
-
