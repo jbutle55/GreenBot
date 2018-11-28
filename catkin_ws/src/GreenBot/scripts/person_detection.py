@@ -6,7 +6,7 @@ from sensor_msgs.msg import Image
 import numpy as np
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-import imutils
+# import imutils
 
 # Should this be top import?
 import roslib
@@ -70,8 +70,8 @@ class PersonDetection:
         self.last_detection = rospy.Time.now()
         self.detection_interval = rospy.Duration(1)  # TODO determine proper interval value
 
-        self.cv_bridge = CvBridge
-        self.detector = HogDetector
+        self.cv_bridge = CvBridge()
+        self.detector = HogDetector()
 
         return
 
@@ -143,7 +143,7 @@ class PersonDetection:
         return np.asarray(unpacked_im[:, :])
 
 # ------------------------------------------------------------------------------
-# END OG PersonDetection CLASS
+# END OF PersonDetection CLASS
 # ------------------------------------------------------------------------------
 
 

@@ -1,0 +1,71 @@
+<launch>
+<!-- set "true" if wanting to use bagfile time stamps rather than PC timestamps for incoming messages. Set "false" otherwise. -->
+<param name="use_sim_time" value="true" />
+
+<!-- HUSKY CONNECTIONS -->    
+
+<arg name="port" default="$(optenv HUSKY_PORT /dev/ttyUSB0)" />
+
+<!-- Husky harware driver -->
+<node pkg="husky_base" type="husky_node" name="husky_node">
+<rosparam subst_value="true">
+ port: $(arg port)
+
+ control_frequency: 10.0
+ diagnostic_frequency: 1.0
+
+ max_acceleration: 0.25
+ max_speed: 0.25
+ wheel_diameter: 0.3302
+ polling_timeout: 10.0
+</rosparam>
+</node>
+
+<!-- Differential controller parameters and basic localization -->
+<include file="$(find husky_control)/launch/control.launch" />
+
+<!-- Diagnostic Aggregator -->
+<node pkg="diagnostic_aggregator" type="aggregator_node" name="diagnostic_aggregator">
+<rosparam command="load" file="$(find husky_base)/config/diagnostics.yaml"/>
+</node>
+
+<!-- launch video stream -->
+   <include file="$(find video_stream_opencv)/launch/camera.launch" >
+        <!-- node name and ros graph name -->
+        <arg name="camera_name" value="frontcam" />
+        <!-- means video device 0, /dev/video0 -->
+        <arg name="video_stream_provider" value="0" />
+        <!-- set camera fps to (if the device allows) -->
+        <arg name="set_camera_fps" value="30"/>
+        <!-- set buffer queue size of frame capturing to -->
+        <arg name="buffer_queue_size" value="100" />
+        <!-- throttling the querying of frames to -->
+        <arg name="fps" value="30" />
+        <!-- setting frame_id -->
+        <arg name="frame_id" value="frontcam" />
+        <arg name="camera_info_url" value="" />
+        <!-- flip the image horizontally (mirror it) -->
+        <arg name="flip_horizontal" value="false" />
+        <!-- flip the image vertically -->
+        <arg name="flip_vertical" value="false" />
+        <!-- visualize on an image_view window the stream generated -->
+        <arg name="visualize" value="true" />
+   </include>
+
+<!-- Launch the Tele-Op Node -->
+  <node name="teleop_husky" pkg="GreenBot" type="teleop_husky.py" respawn="true">
+  </node>
+
+<!-- Launch the Husky node -->
+  <node name="Husky" pkg="GreenBot" type="Husky.py" respawn="true">
+  </node>
+
+<!-- Launch the Person Detector node -->
+  <node name="person_detection" pkg="GreenBot" type="person_detection.py"> respawn="true"
+  </node>
+
+<!-- Launch the Twist Mux node -->
+  <node name="mux" pkg="twist_mux" type="twist_mux.launcher" respawn="true">
+  </node>
+
+</launch>

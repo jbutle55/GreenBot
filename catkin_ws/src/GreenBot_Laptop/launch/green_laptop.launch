@@ -1,0 +1,13 @@
+<launch>
+<!-- set "true" if wanting to use bagfile time stamps rather than PC timestamps for incoming messages. Set "false" otherwise. -->
+<param name="use_sim_time" value="true" />
+
+<!-- Launch Joy Node -->
+  <node name="joy" pkg="joy" type="joy_node">
+  </node>
+
+<!-- Launch the Video node -->
+<node name="image_view" pkg="image_view" type="image:=/frontcam" respawn="true"> output="screen">
+</node>
+
+</launch>

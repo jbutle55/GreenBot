@@ -153,9 +153,12 @@ def run_greenbot(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Determine the mode the GreenBot should start in.')
-    parser.add_argument('mode', choices=['tele', 'auto'],
-                        help="Enter 'Tele' to run GreenBot in teleoperation mode. Enter 'auto' for"
-                             "the GreenBot to autonomously patrol the greenhouse.")
-    arguments = parser.parse_args()
-    sys.exit(run_greenbot(arguments))
+    # parser = argparse.ArgumentParser('Determine the mode the GreenBot should start in.')
+    # parser.add_argument('mode', choices=['tele', 'auto'],
+    #                    help="Enter 'Tele' to run GreenBot in teleoperation mode. Enter 'auto' for"
+    #                         "the GreenBot to autonomously patrol the greenhouse.")
+    # arguments = parser.parse_args()
+    # sys.exit(run_greenbot(arguments))
+    green = GreenBot()
+    green.main()
+
