@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
-import sys
 import rospy
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
-import argparse
 
 # Should this be top import?
 import roslib
@@ -45,32 +43,10 @@ class GreenBot:
     def setup_ros_node(self):
         rospy.init_node('Husky', anonymous=True)  # Create the Husky node
 
-        # Subscriber initiations
-        # self.subscribe_node("controller")  # Joystick controller Node
-        self.subscribe_node("mux")  # Mux Node
-        self.subscribe_node("prox")  # Proximity sensor Node
-        self.subscribe_node("vid")  # Video stream Node
-        self.subscribe_node('barcode')  # Barcode detector Node
+        # Subscriber calls
+        rospy.Subscriber("cmd_vel", Joy, self.callback_controller)
+        # rospy.Subscriber('cmd_vel', Twist, self.callback_mux)
 
-        return
-
-# ------------------------------------------------------------------------------
-    def subscribe_node(self, target):
-        if target is "controller":  # TODO Does sub mux replace this?
-            rospy.Subscriber("husky/cmd_vel", Joy, self.callback_controller)
-        elif target is "prox":
-            # TODO Create proximity sensor sub once using sensors
-            pass
-        elif target is "mux":  # TODO Is mux better to use?
-            rospy.Subscriber('cmd_vel', Twist, self.callback_mux)
-        elif target is "vid":
-            pass
-        elif target is "people":  # Detected person in auto mode
-            # TODO Implement people detector sub once developed
-            pass
-        elif target is "barcode":
-            # TODO Implement barcode sub once developed
-            pass
         return
 
     @staticmethod
@@ -82,11 +58,9 @@ class GreenBot:
         twist = Twist()
         twist.linear.x = 4 * data.axes[1]  # Left stick vertical
         twist.angular.z = 4 * data.axes[0]  # Left stick horizontal
-
         return
 
-    @staticmethod
-    def callback_mux(data):
+    def callback_mux(self, data):
         if len(data) == 0:
                 return  # No data input
 
@@ -131,7 +105,7 @@ class GreenBot:
             if command.linear.x != 0 or command.angular.z != 0:
                 self.publish_move(command)
 
-        rate.sleep()
+            rate.sleep()
 
         return
 # ------------------------------------------------------------------------------
@@ -139,26 +113,7 @@ class GreenBot:
 # ------------------------------------------------------------------------------
 
 
-def run_greenbot(args):
-    config = None
-    if args.mode is 'tele':
-        # Add dict keys relevant to teleoperation mode
-        pass
-    else:
-        # Add dict keys relevant to autonomous mode
-        pass
-    green = GreenBot(config)
-    green.main()
-    return
-
-
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser('Determine the mode the GreenBot should start in.')
-    # parser.add_argument('mode', choices=['tele', 'auto'],
-    #                    help="Enter 'Tele' to run GreenBot in teleoperation mode. Enter 'auto' for"
-    #                         "the GreenBot to autonomously patrol the greenhouse.")
-    # arguments = parser.parse_args()
-    # sys.exit(run_greenbot(arguments))
     green = GreenBot()
     green.main()
 

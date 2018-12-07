@@ -17,7 +17,7 @@ class TeleOpHusky:
         rospy.init_node('teleop_husky')
         rospy.Subscriber('joy', Joy, self.handle_joy)
 
-        self.vel_cmd_pub = rospy.Publisher('husky/cmd_vel', Twist)
+        self.vel_cmd_pub = rospy.Publisher('cmd_vel', Twist)
 
         self.joy_vector = None
         self.joy_data = None
@@ -52,7 +52,7 @@ class TeleOpHusky:
 
         x = joy_data.axes[1]
         y = joy_data.axes[0]
-        joy_vector = np.array([x,y])
+        joy_vector = np.array([x, y])
         joy_vector /= np.linalg.norm(joy_vector)
         joy_vector *= self.magnitude
 
@@ -66,15 +66,16 @@ class TeleOpHusky:
         while not rospy.is_shutdown():
             command = self.compute_motion_cmd()
 
+            # Publish the most recent command
             if command is not None:
                 self.vel_cmd_pub.publish(command)
-        rate.sleep()
+            rate.sleep()
 
         return
 
 # ------------------------------------------------------------------------------
     def compute_motion_cmd(self):
-        command = None
+        command = Twist()
 
         if self.joy_data is None:
             command = None
@@ -85,7 +86,8 @@ class TeleOpHusky:
 
         elif self.override:
             command = Twist()
-            command.linear.x = self.joy_data.axes[1] * self.drive_scale
+            # TODO Double check axes order
+            command.linear.x = self.joy_data.axes[0] * self.drive_scale
             command.angular.z = self.joy_data.axes[1] * self.turn_scale
 
         elif self.safe_motion:
@@ -101,26 +103,32 @@ class TeleOpHusky:
             else:
                 vector_sum[0] = max(-self.safe_reverse_speed, vector_sum[0])
 
-            command = Twist
+            command = Twist()
             command.linear.x = vector_sum[0] * self.drive_scale
             command.angular.z = vector_sum[1] * -self.turn_scale
-
-        return self.clip_velocity(command)
+        if command is not None:
+            return self.clip_velocity(command)
+        else:
+            return None
 
     def clip_velocity(self, command):
         x = command.linear.x
         w = command.angular.z
 
+        # TODO Maybe remove this?
+        # Forward motion
         if abs(x) < self.min_linear:
             x = 0
         if abs(w) < self.min_angular:
             w = 0
 
+        # Reverse motion
         if x < -self.min_linear:
             x = -self.min_linear
         elif x > self.max_linear:
             x = self.max_linear
 
+        # Turning motion
         if w < -self.min_angular:
             w = -self.min_angular
         elif w > self.max_angular:
