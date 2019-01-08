@@ -1,7 +1,4 @@
 <launch>
-<!-- set "true" if wanting to use bagfile time stamps rather than PC timestamps for incoming messages. Set "false" otherwise. -->
-<param name="use_sim_time" value="true" />
-
 <!-- HUSKY CONNECTIONS -->    
 
 <arg name="port" default="$(optenv HUSKY_PORT /dev/ttyUSB0)" />
@@ -29,32 +26,33 @@
 <rosparam command="load" file="$(find husky_base)/config/diagnostics.yaml"/>
 </node>
 
-<!-- launch video stream -->
-   <include file="$(find video_stream_opencv)/launch/camera.launch" >
-        <!-- node name and ros graph name -->
-        <arg name="camera_name" value="frontcam" />
-        <!-- means video device 0, /dev/video0 -->
-        <arg name="video_stream_provider" value="0" />
-        <!-- set camera fps to (if the device allows) -->
-        <arg name="set_camera_fps" value="30"/>
-        <!-- set buffer queue size of frame capturing to -->
-        <arg name="buffer_queue_size" value="100" />
-        <!-- throttling the querying of frames to -->
-        <arg name="fps" value="30" />
-        <!-- setting frame_id -->
-        <arg name="frame_id" value="frontcam" />
-        <arg name="camera_info_url" value="" />
-        <!-- flip the image horizontally (mirror it) -->
-        <arg name="flip_horizontal" value="false" />
-        <!-- flip the image vertically -->
-        <arg name="flip_vertical" value="false" />
-        <!-- visualize on an image_view window the stream generated -->
-        <arg name="visualize" value="true" />
-   </include>
+<!-- ENGAGE CAMERA -->    
+
+	    <group ns="camera">
+		<node pkg="libuvc_camera" type="camera_node" name="mycam">
+			<param name="index" value="0"/>
+			
+			<!-- IMAGE SIZE AND TYPE -->
+			<param name="width" value="1024"/> 
+			<param name="height" value="576"/> 
+			<param name="video_mode" value="yuyv"/> 
+			<param name="frame_rate" value="15"/> 
+
+			<param name="timestamp_method" value="start"/> 
+			<!-- <param name="camera_info_url" value=""/>  -->
+			<param name="auto_exposure" value="3"/> 
+			<param name="auto_white_balance" value="false"/> 
+		</node>
+	</group>
 
 <!-- Launch the Tele-Op Node -->
-  <node name="teleop_husky" pkg="GreenBot" type="teleop_husky.py" respawn="true">
+  <rosparam command="load" file="$(find husky_control)/config/teleop.yaml" />
+  <node name="teleop_husky" pkg="GreenBot" type="teleop_husky.py" output="screen" respawn="true">
   </node>
+
+<!--Joy -->
+	    <rosparam command="load" file="$(find husky_control)/config/teleop.yaml" />
+	    <node pkg="teleop_twist_joy" type="teleop_node" name="teleop_twist_joy"/>
 
 <!-- Launch the Husky node -->
   <node name="Husky" pkg="GreenBot" type="Husky.py" respawn="true">

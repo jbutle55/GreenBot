@@ -11,7 +11,7 @@ roslib.load_manifest("GreenBot")
 
 # NODES
 # -------------------
-# Control pad Node
+# Joy pad Node
 # Husky Node (MASTER)
 # Mux Node
 # QR Code node
@@ -28,26 +28,21 @@ class GreenBot:
     """
 
     def __init__(self):
-        self.setup_ros_node()
-        self.control_rate = 30  # TODO determine proper publish rate (Control_rate) below
-        # Publish on husky_velocity_controller/cmd_vel topic
-        self.control_pub = rospy.Publisher("cmd_vel_topic", Twist)
-        # husky_velocity_controller/cmd_vel instead of vel_topic
+        rospy.init_node('Husky')  # Create the Husky node
 
+        #  Initiations
+        self.control_rate = 10  # TODO determine proper publish rate
         self.mux_twist = Twist()
         self.twist = Twist()
+
+        # Subscriber Initiations
+        rospy.Subscriber("husky/cmd_vel", Joy, self.callback_controller)  # cmd_vel
+        # Publisher Initiations
+        self.control_pub = rospy.Publisher("cmd_vel_topic", Twist, queue_size=10)
 
         return
 
 # ------------------------------------------------------------------------------
-    def setup_ros_node(self):
-        rospy.init_node('Husky', anonymous=True)  # Create the Husky node
-
-        # Subscriber calls
-        rospy.Subscriber("cmd_vel", Joy, self.callback_controller)
-        # rospy.Subscriber('cmd_vel', Twist, self.callback_mux)
-
-        return
 
     @staticmethod
     def callback_controller(data):
@@ -59,6 +54,8 @@ class GreenBot:
         twist.linear.x = 4 * data.axes[1]  # Left stick vertical
         twist.angular.z = 4 * data.axes[0]  # Left stick horizontal
         return
+
+# ------------------------------------------------------------------------------
 
     def callback_mux(self, data):
         if len(data) == 0:
@@ -96,17 +93,21 @@ class GreenBot:
 
         return cmd
 
+    def control_mast(self):
+        
+        return
+
 # ------------------------------------------------------------------------------
     def main(self):
         rate = rospy.Rate(self.control_rate)
         while not rospy.is_shutdown():
-            command = self.compute_vel()
+            mast_command = self.control_mast()  # Check for mast command
+            vel_command = self.compute_vel()  # Check for teleoperation command
 
-            if command.linear.x != 0 or command.angular.z != 0:
-                self.publish_move(command)
+            if vel_command.linear.x != 0 or vel_command.angular.z != 0:
+                self.publish_move(vel_command)
 
-            rate.sleep()
-
+            #rate.sleep()
         return
 # ------------------------------------------------------------------------------
 # END OF GreenBot CLASS

@@ -62,10 +62,17 @@ class PersonDetection:
 
     """
     def __init__(self):
-        self.detected_people_topic = "person_detection/people"
-        self.vid_topic = "frontcam"
-        self.visualization_topic = "person_detection/viz"
-        self.setup_ros_node()
+        rospy.init_node('person_detector')  # Create the detector node
+        # Node Names
+        self.detected_people_topic = "person_detection/person"
+        self.vid_topic = "frontcam"  # TODO Correct topic name
+        self.visualization_topic = "person_detection/viz" # TODO Name topic
+        # Subscriber Initiations
+        rospy.Subscriber(self.vid_topic, Image, self.process_image)
+
+        # Publisher Initiations
+        self.people_pub = rospy.Publisher(self.detected_people_topic, Polygon, queue_size=10)
+        self.viz_publisher = rospy.Publisher(self.visualization_topic, Image, queue_size=10)
 
         self.last_detection = rospy.Time.now()
         self.detection_interval = rospy.Duration(1)  # TODO determine proper interval value
@@ -76,18 +83,8 @@ class PersonDetection:
         return
 
 # ------------------------------------------------------------------------------
-    def setup_ros_node(self):
-        rospy.init_node('person_detector', anonymous=True)  # Create the detector node
-
-        self.people_pub = rospy.Publisher(self.detected_people_topic, Polygon)
-        self.viz_publisher = rospy.Publisher(self.visualization_topic, Image)
-
-        rospy.Subscriber(self.vid_topic, Image, self.process_image)
-        return
-
-# ------------------------------------------------------------------------------
     # Check if any Nodes are subscribed to this Node
-    # Skip processing if not to save resources
+    # Skip processing if not to save resources (Tele-operation)
     def no_one_listening(self):
         return self.people_pub.get_num_connections() < 1 \
                and self.viz_publisher.get_num_connections() < 1
@@ -115,7 +112,7 @@ class PersonDetection:
             super_polygon.append(Point32(x=rect[2][0], y=rect[2][1], z=0))
             super_polygon.append(Point32(x=rect[3][0], y=rect[3][1], z=0))
 
-        self.people_pub.publish(Polygon(super_polygon))
+        self.people_pub.publish(Polygon(super_polygon))  # Publish to teleop_husky node
         self.publish_viz(rectangles, cv_im)
 
         return
@@ -135,6 +132,7 @@ class PersonDetection:
 
 # ------------------------------------------------------------------------------
     def unpack_image(self, message):
+        unpacked_im = None
         try:
             unpacked_im = self.cv_bridge.imgmsg_to_cv2(message, desired_encoding='bgr8')
         except CvBridgeError, e:
@@ -149,5 +147,4 @@ class PersonDetection:
 
 if __name__ == '__main__':
     detect = PersonDetection()
-
 
