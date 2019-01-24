@@ -3,28 +3,24 @@ import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Joy
 import numpy as np
+import re
 import serial
-from smbus2 import SMBusWrapper
-
 
 # Should this be top import?
 import roslib
 roslib.load_manifest("GreenBot")
 
 
-# The class used to manage a Node for an individual Modern Robotics Range Sensor
-# The Husky will use 4 of these sensors
+# The class is used to manage a Node for an individual HC-SR04 ultrasonic sensor
+# The Husky will use 4 of these sensors (1 @ each corner above the wheel)
 class RangeSense:
 
     def __init__(self):
         rospy.init_node('range_sensor')  # Initiate range sensor node
+        self.udoo_serial = self.setup_serial()  # Initiate serial communication with x86 Arduio
 
         # TODO change topic name, topic type (Probably not Twist)
         self.sensor_pub = rospy.Publisher('topic', Twist, queue_size=10)  # Publish sensor detection
-
-        self.i2c_addresses = {'FL': '0x28', 'FR': '0x', 'BL': '0x', 'BR': '0x'}
-        self.sensor_id = '0x55'
-        self.sensor_registers = {'ultrasonic': '0x04', 'optical': '0x05'}
 
         self.sensor_i2c = None
         self.sensed_range = None
@@ -35,28 +31,35 @@ class RangeSense:
 
 # ------------------------------------------------------------------------------
 
-    # Read the sensor output via I2C and determine range
+    @staticmethod
+    def setup_serial():
+        ser = serial.Serial('/dev/ttyS0', 115200, timeout=1)
+        ser.flushOutput()
+
+        return ser
+
+# ------------------------------------------------------------------------------
+
+    # Read the sensor output via arduino digital pins
     def read_sensor(self):
         raw_data = None
         sense_data = {}
 
-        # Read ultrasonic register first then optical # TODO swap order for better safety?
-        # The ultrasonic register value is in cm and is linear
-        # The optical sensor is exponential
+        # Use arduino to handle time keeping and time calculations
+        # Use Braswell to manage 4 sensors results and publish data
 
-        for position, address in self.i2c_addresses:
-            for measurement_type, reg in self.sensor_registers:
-                # Read register
-                # TODO implement I2C reading
-                with SMBusWrapper(1) as bus:  # TODO Change 1 to actual i2c bus number
-                    raw_data = bus.read_i2c_block_data(address, reg, 16)  # TODO Change length from 16?
+        self.udoo_serial.write(b'Read Sensors')  # Signal arduino to read sensors
+        self.udoo_serial.read_until('Data Ready')  # Poll serial until ranges calculated
+        raw_data = self.udoo_serial.read_until('Data Complete')  # Read serial until all data read
 
-                if measurement_type is 'ultrasonic' and 5 <= raw_data < 255:
-                    sense_data[position] = raw_data
-                elif measurement_type is 'optical' and 0 < raw_data < 5:
-                    # TODO determine optical exponential curve
-                    pass
-            # TODO determine topic type and format to be used in publish()
+        # Seperate raw data
+        range_re = re.compile(r"(?P<position>\w+): (?P<range>\d+)")
+        range_data = range_re.match(raw_data)
+
+        for data in range_data.groupdict():
+            sense_data[data] = range_data[data]
+
+        # TODO might be able to just return range_data.groupdict()?
 
         return sense_data  # Dictionary of distance measured (in cm) from each sensor
 
@@ -64,7 +67,7 @@ class RangeSense:
 
     def start(self):
         while not rospy.is_shutdown():
-            self.sensed_range = self.read_sensor()
+            self.sensed_range = self.read_sensor()  # Read the range sensors
 
             if self.sensed_range is not None:
                 self.sensor_pub.publish(self.sensed_range)
