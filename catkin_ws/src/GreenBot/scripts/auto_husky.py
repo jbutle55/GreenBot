@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist, Polygon, Point32
+from std_msgs.msg import String
 from sensor_msgs.msg import Joy
 import numpy as np
 import serial
@@ -22,9 +23,18 @@ class AutoHusky:
         # Subscriber Initiations
         rospy.Subscriber('person_detection/person', Polygon, self.handle_polygon)
         rospy.Subscriber('my_cam', )
+        rospy.Subscriber('barcode', String, self.handle_qr)
 
         # Publisher Initiations
         self.vel_cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
+
+        self.detect_qr = False
+        self.polygon_data = None
+
+        self.ultra_data = None
+
+        self.state = None
+        self.possible_states = ['In_Row', 'Entering_Row', 'Leaving_Row', 'In_Aisle']
 
         # Open the serial port
         self.arduino = serial.Serial(self.get_usb_info(), 9600)
@@ -56,12 +66,32 @@ class AutoHusky:
 
         return
 
-    # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+    def handle_qr(self, data):
+        qr_data = data
+        if qr_data is not None:  # TODO is the data None if empty?
+            self.detect_qr = True
+        else:
+            self.detect_qr = False
+
+        return
+
+# ------------------------------------------------------------------------------
+    def determine_state(self):
+
+        return
+
+# ------------------------------------------------------------------------------
+    def drive(self):
+
+        return
+
+# ------------------------------------------------------------------------------
     def start(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            pass
-
+            self.determine_state()  # Use data from ultra sensors, front camera
+            self.drive()  # Send drive command
         return
 
 # ------------------------------------------------------------------------------

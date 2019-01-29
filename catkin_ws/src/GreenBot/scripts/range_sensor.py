@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist
+from std_msgs.msg import String
 import re
 import serial
 import time
 import csv
+import os
 
 # Should this be top import?
 import roslib
@@ -21,7 +23,8 @@ class RangeSense:
         self.create_csv()
 
         # TODO change topic name, topic type (Probably not Twist)
-        self.sensor_pub = rospy.Publisher('topic', Twist, queue_size=10)  # Publish sensor detection
+        # Publish sensor detection
+        self.sensor_pub = rospy.Publisher('ultra_data', String, queue_size=10)
 
         self.sensed_range = None
         self.sensed_data = {'FL': None, 'FR': None, 'BL': None, 'BR': None}  # In cm
@@ -40,9 +43,14 @@ class RangeSense:
 # ------------------------------------------------------------------------------
     @staticmethod
     def create_csv():
-        with open('nav_data.csv', 'wb') as nav:
-            writer = csv.writer(nav, delimeter=',')
-            writer.writerow(['Time', 'FR', 'FL', 'BR', 'BL'])  # Create headers
+        if os.path.isfile('nav_data.csv'):  # Avoid overwriting existing data
+            with open('nav_data.csv', 'a') as nav:
+                writer = csv.writer(nav, delimeter=',')
+                writer.writerow('')  # Write empty row
+        else:
+            with open('nav_data.csv', 'wb') as nav:
+                writer = csv.writer(nav, delimeter=',')
+                writer.writerow(['Time', 'FR', 'FL', 'BR', 'BL'])  # Create headers
 
         return
 
@@ -66,7 +74,7 @@ class RangeSense:
         # Use Braswell to manage 4 sensors results and publish data
 
         self.udoo_serial.write(b'Read Sensors')  # Signal Arduino to read sensors
-        self.udoo_serial.read_until('Data Ready')  # Poll serial until ranges calculated
+        self.udoo_serial.read_until(b'Data Ready')  # Poll serial until ranges calculated
         raw_data = self.udoo_serial.read_until('Data Complete')  # Read serial until all data read
 
         # Separate raw data
@@ -88,7 +96,7 @@ class RangeSense:
             self.sensed_range = self.read_sensor()  # Read the range sensors
 
             if self.sensed_range is not None:
-                self.sensor_pub.publish(self.sensed_range)  # Publish sensor data
+                self.sensor_pub.publish(self.sensed_range)  # Publish sensor data to ultra topic
 
         return
 

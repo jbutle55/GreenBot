@@ -2,10 +2,12 @@
 import rospy
 from geometry_msgs.msg import Twist, Polygon, Point32
 from sensor_msgs.msg import Joy
+from std_msgs.msg import String
 import numpy as np
 import serial
 import subprocess
 import re
+import time
 
 # Should this be top import?
 import roslib
@@ -17,11 +19,13 @@ roslib.load_manifest("GreenBot")
 # ------------------------------------------------------------------------------
 class TeleOpHusky:
     def __init__(self):
-        rospy.init_node('teleop_husky') # Initiate teleop node
+        rospy.init_node('teleop_husky')  # Initiate teleop node
 
         # Subscriber Initiations
         rospy.Subscriber('joy', Joy, self.handle_joy)
         rospy.Subscriber('person_detection/person', Polygon, self.handle_polygon)
+        rospy.Subscriber('my_cam', )
+        rospy.Subscriber('qr', String, self.handle_qr)
 
         # Publisher Initiations
         self.vel_cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
@@ -33,6 +37,7 @@ class TeleOpHusky:
 
         # Automation variables
         self.polygon_data = None
+        self.qr_data = None
 
         self.min_linear = 0.1
         self.max_linear = 0.95
@@ -48,6 +53,12 @@ class TeleOpHusky:
         self.override_buttons = [self.deadman_button]
         self.override = False
         self.safe_motion = False
+        self.detect_qr = False
+
+        self.image_time_start = None
+        self.image_duration = 10  # 10s to image plant
+        self.imaging = False
+        self.at_plant = False
 
         # Open the serial port
         self.arduino = serial.Serial(self.get_usb_info(), 9600)
@@ -96,13 +107,26 @@ class TeleOpHusky:
 
         return
 
-    # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
     def handle_polygon(self, poly_data):
         self.polygon_data = poly_data
 
         return
 
-    # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+    def handle_qr(self, data):
+        if self.qr_data == data:  # Check if still reading the same QR code
+            return  # Already storing this data
+        self.qr_data = data
+
+        if self.qr_data is not None:  # TODO is the data None if empty? Empty string?
+            self.detect_qr = True
+        else:
+            self.detect_qr = False
+
+        return
+
+# ------------------------------------------------------------------------------
     def start(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
@@ -119,10 +143,31 @@ class TeleOpHusky:
         return
 
 # ------------------------------------------------------------------------------
+    def image_plant(self):
+        # Drive forward X meters
+        # TODO send drive command
+
+        # Image for X seconds
+        self.image_time_start = time.time()
+        while time.time() - self.image_duration < self.image_time_start:
+            pass  # Wait while plant is being imaged
+
+        # Clear all flags before moving onto next plant once done
+        self.imaging = False
+        self.detect_qr = False
+        self.qr_data = None
+
+        return
+
+# ------------------------------------------------------------------------------
     def compute_motion_cmd(self):
         command = Twist()
 
         if self.joy_data is None:
+            command = None
+
+        elif self.detect_qr is not False:  # Detected QR therefore stop at plant and image
+            self.image_plant()
             command = None
 
         # Don't move if not touching thumb stick
@@ -207,6 +252,14 @@ class TeleOpHusky:
     def pub_mast_cmd(self, command):
         # encode in the appropriate format and send
         self.arduino.write(command.encode())
+
+        return
+
+    def store_video(self):
+
+        return
+
+    def store_ultra_data(self):
 
         return
 
