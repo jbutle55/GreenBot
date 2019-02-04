@@ -88,14 +88,15 @@ class TeleOpHusky:
         self.joy_data = joy_data
         self.override = True
 
-        for button in self.override_buttons:
-            if joy_data.buttons[button] == 0:
-                self.override = False
+        #for button in self.override_buttons:
+        #    if joy_data.buttons[button] == 0:
+        #        self.override = False
 
-        self.safe_motion = not self.override and joy_data.buttons[self.deadman_button] != 0
+        #self.safe_motion = not self.override and joy_data.buttons[self.deadman_button] != 0
+        self.safe_motion = joy_data.buttons[self.deadman_button] != 0
 
-        x = joy_data.axes[1]
-        y = joy_data.axes[0]
+        x = joy_data.axes[5]
+        y = joy_data.axes[4]
         joy_vector = np.array([x, y])
         joy_vector /= np.linalg.norm(joy_vector)
         joy_vector *= self.magnitude
@@ -171,20 +172,20 @@ class TeleOpHusky:
             command = None
 
         # Don't move if not touching thumb stick
-        elif self.joy_data.axes[1] == 0.0 and self.joy_data.axes[0] == 0.0:
-            command = None
+        #elif self.joy_data.axes[5] == 0.0 and self.joy_data.axes[4] == 0.0:
+        #    command = None
 
-        elif self.override:
-            command = Twist()
-            # TODO Double check axes order
-            command.linear.x = self.joy_data.axes[1] * self.drive_scale
-            command.angular.z = self.joy_data.axes[0] * self.turn_scale
+        #elif self.override:
+        #    command = Twist()
+        #    # TODO Double check axes order
+        #    command.linear.x = self.joy_data.axes[1] * self.drive_scale
+        #    command.angular.z = self.joy_data.axes[0] * self.turn_scale
 
         elif self.safe_motion:
             vector_sum = self.joy_vector
             vector_sum /= np.linalg.norm(self.joy_vector)
 
-            joy_cmd_vector = np.array([self.joy_data.axes[1], self.joy_data.axes[0]])
+            joy_cmd_vector = np.array([self.joy_data.axes[5], self.joy_data.axes[4]])
             vector_sum *= np.linalg.norm(joy_cmd_vector)
 
             # Reduce reverse motion speed (Can't see behind us)
@@ -194,8 +195,9 @@ class TeleOpHusky:
                 vector_sum[0] = max(-self.safe_reverse_speed, vector_sum[0])
 
             command = Twist()
-            command.linear.x = vector_sum[1] * self.drive_scale
-            command.angular.z = vector_sum[0] * -self.turn_scale
+            command.linear.x = vector_sum[5] * self.drive_scale
+            command.angular.z = vector_sum[4] * -self.turn_scale
+
         if command is not None:
             return self.clip_velocity(command)
         else:
