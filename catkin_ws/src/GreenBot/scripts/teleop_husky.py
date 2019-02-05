@@ -1,17 +1,22 @@
 #!/usr/bin/env python
 import rospy
-from geometry_msgs.msg import Twist, Polygon, Point32
+from geometry_msgs.msg import Twist, Polygon
 from sensor_msgs.msg import Joy
 from std_msgs.msg import String
+from rospy_message_converter import message_converter
 import numpy as np
 import serial
 import subprocess
 import re
 import time
+import csv
+import os
 
 # Should this be top import?
 import roslib
+
 roslib.load_manifest("GreenBot")
+np.seterr(divide='ignore', invalid='ignore')
 
 
 # ------------------------------------------------------------------------------
@@ -24,11 +29,18 @@ class TeleOpHusky:
         # Subscriber Initiations
         rospy.Subscriber('joy', Joy, self.handle_joy)
         rospy.Subscriber('person_detection/person', Polygon, self.handle_polygon)
-        rospy.Subscriber('my_cam', )
-        rospy.Subscriber('qr', String, self.handle_qr)
+        # rospy.Subscriber('Camera/raw_image', )
+        # rospy.Subscriber('/barcode', String, self.handle_qr)
+        rospy.Subscriber('Range_Data', String, self.handle_range)
+
+        self.create_csv()  # Create csv file for data storage
 
         # Publisher Initiations
         self.vel_cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
+
+        # Environment Variables
+        self.qr_data = None
+        self.range_data = None
 
         # Teleop variables
         self.joy_vector = None
@@ -37,7 +49,6 @@ class TeleOpHusky:
 
         # Automation variables
         self.polygon_data = None
-        self.qr_data = None
 
         self.min_linear = 0.1
         self.max_linear = 0.95
@@ -61,11 +72,12 @@ class TeleOpHusky:
         self.at_plant = False
 
         # Open the serial port
-        self.arduino = serial.Serial(self.get_usb_info(), 9600)
+        # self.arduino = serial.Serial(self.get_usb_info(), 9600)
+        self.arduino = None
 
         return
 
-# ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
     @staticmethod
     def get_usb_info():
         # regular expression for lsusb output
@@ -83,17 +95,17 @@ class TeleOpHusky:
 
         return device
 
-# ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
     def handle_joy(self, joy_data):
         self.joy_data = joy_data
         self.override = True
 
-        #for button in self.override_buttons:
-        #    if joy_data.buttons[button] == 0:
-        #        self.override = False
+        for button in self.override_buttons:
+            if joy_data.buttons[button] == 0:
+                self.override = False
 
-        #self.safe_motion = not self.override and joy_data.buttons[self.deadman_button] != 0
-        self.safe_motion = joy_data.buttons[self.deadman_button] != 0
+        self.safe_motion = not self.override and joy_data.buttons[self.deadman_button] != 0
+        # self.safe_motion = joy_data.buttons[self.deadman_button] != 0
 
         x = joy_data.axes[5]
         y = joy_data.axes[4]
@@ -108,38 +120,50 @@ class TeleOpHusky:
 
         return
 
-# ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
+
+    def handle_range(self, range_data):
+        self.range_data = message_converter.convert_ros_message_to_dictionary(range_data)
+        self.store_range_data(self.range_data)  # Store range data in csv
+
+        return
+
+    # ------------------------------------------------------------------------------
     def handle_polygon(self, poly_data):
         self.polygon_data = poly_data
 
         return
 
-# ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
     def handle_qr(self, data):
-        if self.qr_data == data:  # Check if still reading the same QR code
-            return  # Already storing this data
+        # if self.qr_data == data:  # Check if still reading the same QR code
+        #     return  # Already storing this data
         self.qr_data = data
+        self.store_qr_data()
 
-        if self.qr_data is not None:  # TODO is the data None if empty? Empty string?
-            self.detect_qr = True
-        else:
-            self.detect_qr = False
+        # if self.qr_data is not None:  # TODO is the data None if empty? Empty string?
+        #     self.detect_qr = True
+        # else:
+        #     self.detect_qr = False
 
         return
 
-# ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------
     def start(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             vel_command = self.compute_motion_cmd()
-            mast_command = self.mast_cmd()
+            # mast_command = self.mast_cmd()
+            mast_command = None
 
-            # Publish the most recent command
-            if vel_command is not None:
-                self.vel_cmd_pub.publish(vel_command)
-            elif mast_command is not None:
-                self.pub_mast_cmd(mast_command)
-            #  rate.sleep()
+        # Publish the most recent command
+        if vel_command is not None:
+            self.vel_cmd_pub.publish(vel_command)
+        elif mast_command is not None:
+            pass
+
+        # self.pub_mast_cmd(mast_command)
+        #  rate.sleep()
 
         return
 
@@ -172,14 +196,14 @@ class TeleOpHusky:
             command = None
 
         # Don't move if not touching thumb stick
-        #elif self.joy_data.axes[5] == 0.0 and self.joy_data.axes[4] == 0.0:
-        #    command = None
+        elif self.joy_data.axes[5] == 0.0 and self.joy_data.axes[4] == 0.0:
+            command = None
 
-        #elif self.override:
-        #    command = Twist()
-        #    # TODO Double check axes order
-        #    command.linear.x = self.joy_data.axes[1] * self.drive_scale
-        #    command.angular.z = self.joy_data.axes[0] * self.turn_scale
+        elif self.override:
+            command = Twist()
+            # TODO Double check axes order
+            command.linear.x = self.joy_data.axes[5] * self.drive_scale
+            command.angular.z = self.joy_data.axes[4] * self.turn_scale
 
         elif self.safe_motion:
             vector_sum = self.joy_vector
@@ -195,8 +219,8 @@ class TeleOpHusky:
                 vector_sum[0] = max(-self.safe_reverse_speed, vector_sum[0])
 
             command = Twist()
-            command.linear.x = vector_sum[5] * self.drive_scale
-            command.angular.z = vector_sum[4] * -self.turn_scale
+            command.linear.x = vector_sum[0] * self.drive_scale
+            command.angular.z = vector_sum[1] * -self.turn_scale
 
         if command is not None:
             return self.clip_velocity(command)
@@ -233,7 +257,6 @@ class TeleOpHusky:
 
 # ------------------------------------------------------------------------------
     def mast_cmd(self):
-
         # TODO fix button order
         if self.mast_controls[0] != 0:  # 'A' button for UP
             command = 'u'
@@ -257,13 +280,50 @@ class TeleOpHusky:
 
         return
 
+# ------------------------------------------------------------------------------
+
+    @staticmethod
+    def create_csv():
+        if os.path.isfile('nav_data.csv'):  # Avoid overwriting existing data
+            with open('nav_data.csv', 'a') as nav:
+                writer = csv.writer(nav, delimiter=',')
+                writer.writerow('')  # Write empty row
+        else:
+            with open('nav_data.csv', 'wb') as nav:
+                writer = csv.writer(nav, delimiter=',')
+                writer.writerow(['Time', 'Type', 'FR', 'FL', 'BR', 'BL'])  # Create headers
+
+        return
+
+# ------------------------------------------------------------------------------
+    @staticmethod
     def store_video(self):
+        # TODO maybe done in launch file?
+        return
+
+    @staticmethod
+    def store_range_data(range_dict):
+        data = [time.time(), 'Range', range_dict['FR'], range_dict['FL'], range_dict['BR'],
+                range_dict['BL']]
+        with open('nav_data.csv', 'a') as nav:  # Store the range data and time in an appended csv
+            writer = csv.writer(nav, delimiter=',')
+            writer.writerow(data)  # Write data
 
         return
 
-    def store_ultra_data(self):
+    def store_qr_data(self):
+        # regular expression for qr string
+        qr_re = re.compile(r'data:\s"(?P<data>\w+)"$', re.IGNORECASE)
+
+        qr_info = qr_re.match(self.qr_data)
+
+        data = [time.time(), 'QR Data', qr_info['data']]
+        with open('nav_data.csv', 'a') as nav:  # Store the qr data and time in an appended csv
+            writer = csv.writer(nav, delimiter=',')
+            writer.writerow(data)  # Write data
 
         return
+
 
 # ------------------------------------------------------------------------------
 # END OF Teleoperation CLASS
@@ -273,4 +333,3 @@ class TeleOpHusky:
 if __name__ == '__main__':
     cmd = TeleOpHusky()
     cmd.start()
-

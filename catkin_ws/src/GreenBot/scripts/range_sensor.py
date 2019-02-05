@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+from rospy_message_converter import message_converter
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 import re
@@ -18,13 +19,13 @@ roslib.load_manifest("GreenBot")
 class RangeSense:
 
     def __init__(self):
-        rospy.init_node('range_sensor')  # Initiate range sensor node
+        rospy.init_node('Range_Sensor')  # Initiate range sensor node
         self.udoo_serial = self.setup_serial()  # Initiate serial communication with x86 Arduio
         self.create_csv()
 
         # TODO change topic name, topic type (Probably not Twist)
         # Publish sensor detection
-        self.sensor_pub = rospy.Publisher('ultra_data', String, queue_size=10)
+        self.sensor_pub = rospy.Publisher('Range_Data', String, queue_size=10)
 
         self.sensed_range = None
         self.sensed_data = {'FL': None, 'FR': None, 'BL': None, 'BR': None}  # In cm
@@ -35,7 +36,7 @@ class RangeSense:
 
     @staticmethod
     def setup_serial():
-        ser = serial.Serial('/dev/ttyS0', 115200, timeout=1)
+        ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
         ser.flushOutput()
 
         return ser
@@ -45,11 +46,11 @@ class RangeSense:
     def create_csv():
         if os.path.isfile('nav_data.csv'):  # Avoid overwriting existing data
             with open('nav_data.csv', 'a') as nav:
-                writer = csv.writer(nav, delimeter=',')
+                writer = csv.writer(nav, delimiter=',')
                 writer.writerow('')  # Write empty row
         else:
             with open('nav_data.csv', 'wb') as nav:
-                writer = csv.writer(nav, delimeter=',')
+                writer = csv.writer(nav, delimiter=',')
                 writer.writerow(['Time', 'FR', 'FL', 'BR', 'BL'])  # Create headers
 
         return
@@ -84,10 +85,11 @@ class RangeSense:
         for data in range_data.groupdict():
             sense_data[data] = range_data[data]
 
-        self.store_range_csv(sense_data)  # Store range data and time in the csv
-
-        # TODO might be able to just return range_data.groupdict()?
-        return sense_data  # Dictionary of distance measured (in cm) from each sensor
+        # self.store_range_csv(sense_data)  # Store range data and time in the csv
+        string_sense_data = message_converter.convert_dictionary_to_ros_message('std_msgs/String',
+                                                                                sense_data)
+        # String of dictionary of distance measured (in cm) from each sensor
+        return string_sense_data
 
 # ------------------------------------------------------------------------------
 

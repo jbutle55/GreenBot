@@ -105,7 +105,7 @@ class AutoHusky:
 
         return
 
-    def store_ultra_data(self):
+    def store_range_data(self):
 
         return
 
