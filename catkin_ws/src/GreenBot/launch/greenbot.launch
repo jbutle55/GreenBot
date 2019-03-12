@@ -27,7 +27,7 @@
 </node>
 
 <!-- ENGAGE CAMERA -->
-<group ns="camera">
+<group ns="front_camera">
 	<node pkg="libuvc_camera" type="camera_node" name="mycam">
 		<param name="index" value="0"/>
 			
@@ -54,6 +54,7 @@
 <node pkg="teleop_twist_joy" type="teleop_node" name="teleop_twist_joy"/>
 
 <!-- LAUNCH HUSKY NODE -->
+
 <!--node name="Husky" pkg="GreenBot" type="Husky.py" respawn="true"-->
 <!--/node-->
 

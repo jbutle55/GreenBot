@@ -291,13 +291,13 @@ class TeleOpHusky:
         else:
             with open('nav_data.csv', 'wb') as nav:
                 writer = csv.writer(nav, delimiter=',')
-                writer.writerow(['Time', 'Type', 'FR', 'FL', 'BR', 'BL'])  # Create headers
+                writer.writerow(['Time', 'Data Type', 'FR', 'FL', 'BR', 'BL'])  # Create headers
 
         return
 
 # ------------------------------------------------------------------------------
     @staticmethod
-    def store_video(self):
+    def store_video(video_data):
         # TODO maybe done in launch file?
         return
 
@@ -314,7 +314,6 @@ class TeleOpHusky:
     def store_qr_data(self):
         # regular expression for qr string
         qr_re = re.compile(r'data:\s"(?P<data>\w+)"$', re.IGNORECASE)
-
         qr_info = qr_re.match(self.qr_data)
 
         data = [time.time(), 'QR Data', qr_info['data']]
